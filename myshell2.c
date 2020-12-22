@@ -15,6 +15,7 @@
 char *getPrompt(char *prompt);
 void myPwd();
 void myCd(char *path);
+void myEcho(int argc, char *argv[]);
 int splitToken(char *command, char *argv[], int cmdSize);
 char *getNextToken(char *command);
 int internalCommand(int argc, char *argv[]);
@@ -37,7 +38,7 @@ int main() {
 		prompt = getPrompt(prompt);
 		write(1, prompt, strlen(prompt));
 		fgets(cmd, MAX_CMD, stdin);
-
+		//명령어 입력받기
 		if (cmd[0] == '\n')
 			continue;
 
@@ -45,9 +46,9 @@ int main() {
 		command = malloc(cmdSize * sizeof(char));
 		strcpy(command, cmd);
 		argc = splitToken(command, argv, cmdSize);
-		
-		if (!internalCommand(argc, argv))
-			externalCommand(argc, argv);
+		//입력받은 명령어를 토큰단위로 나눈다.
+		if (!internalCommand(argc, argv)) //내부 명령어가 수행되지 않으면
+			externalCommand(argc, argv);		//외부 명령어 수행
 
 		for (i = 0; i < argc; i++) {
 			argv[i] = NULL;
@@ -56,16 +57,16 @@ int main() {
 		command = NULL;
 		prompt = NULL;
 		cmd[0] = '\0';
-		free(command);
-		free(prompt);
+		free(command);	//메모리 초기화
+		free(prompt);		//같다
 	}
 }
 
-char *getPrompt(char *prompt) {
+char *getPrompt(char *prompt) { //prompt를 현재 디렉토리로 설정
 	static char path[MAX_PATH];
 	
 	prompt = malloc(sizeof(char) * MAX_PROMPT);
-	getcwd(path, MAX_PATH);
+	getcwd(path, MAX_PATH); //사용
 	strcat(prompt, "~");
 	if (!strncmp(path, "$", 9)){
 		strcat(prompt, "~");
@@ -95,6 +96,7 @@ int splitToken(char *command, char *argv[], int cmdSize) {
 		}
 		
 		argv[argc] = getNextToken(command);
+		//토큰단위로 argv에 담는다.
 		tokenSize = strlen(argv[argc]);
 		
 		if (cmdSize == tokenSize+1) {
@@ -122,37 +124,47 @@ char *getNextToken(char *command) {
 	return argv;
 }
 
-void myCd(char *path) {
+void myCd(char *path) { //mycd 명령어 구현
 	if (path[0] == '~')
 		path = getenv("HOME");
 	if (chdir(path) == -1)
 		printf("폴더 %s가 존재하지 않습니다.\n", path);
 }
 
-void myPwd() {
+void myPwd() { //mypwd 명령어 구현
 	char currentPath[256];
 
 	getcwd(currentPath, 256);
 	printf("현재 작업 디렉토리 : %s\n", currentPath);
 }
 
-int internalCommand(int argc, char *argv[]){  
-	if (!strcmp(argv[0], "exit")) {
+void myEcho(int argc, char *argv[]){ //echo명령어 구현
+  int i = 0;
+  for(i = 0; i < argc; i++){
+    printf("%s%s", argv[i], (argc-i) ? " " : "");
+  }
+  printf("\n");
+}
+
+int internalCommand(int argc, char *argv[]){  //내부 명령어 입력 인식
+	if (!strcmp(argv[0], "exit")) {	//exit 명령 실행
 		puts("Good Bye^^");
 		exit(0);
-	} else if (!strcmp(argv[0], "pwd")){
+	} else if (!strcmp(argv[0], "pwd")){ //pwd 명령 실행
 		myPwd();
 		return 1;
+	} else if(!strcmp(argv[0], "echo")){ //echo 명령 실행
+		myEcho(argc, argv);
 	}
-	else if (!strcmp(argv[0], "cd")) {
+	else if (!strcmp(argv[0], "cd")) { //cd 명령 실행
 		argc <= 1 ? myCd("~") : myCd(argv[1]);
 		return 1;
 	}
 	return 0;
 }
 
-int parseToken(int argc, char *argv[]) {
-	if (argv[1][0] == '<')
+int parseToken(int argc, char *argv[]) { //외부 명령어 판독
+	if (argv[1][0] == '<') 
 		return 1;
 	else if (argv[1][0] == '>')
 		return 2;
@@ -161,7 +173,7 @@ int parseToken(int argc, char *argv[]) {
 	return 0;
 }
 
-void externalCommand(int argc, char *argv[]) {
+void externalCommand(int argc, char *argv[]) { //외부 명령어 입력
 	int pt = 0;
 
 	if (argc != 1)
@@ -176,22 +188,22 @@ void externalCommand(int argc, char *argv[]) {
 	}
 }
 
-void redInCommand(int argc, char *argv[]) {
-	int fd = open(argv[2], O_RDONLY);
+void redInCommand(int argc, char *argv[]) { //재지향 명령어 (input) <
+	int fd = open(argv[2], O_RDONLY); //파일 디스크립터 생성(읽기 전용)
 	int pid, status;
 
-	pid = fork();
+	pid = fork(); //자식 프로세스 생성
 	if (pid != 0)
 		pid = wait(&status);
 	else {
-		dup2(fd, 0);
-		execvp(argv[0], argv);
+		dup2(fd, 0); //dup2(파일 식별자 복제) 실행 후 자식의 모든 출력 fd로 저장
+		execvp(argv[0], argv); //exec으로 원하는 것 실행
 		exit(1);
 	}
 	close(fd);
 }
 
-void redOutCommand(int argc, char *argv[]) {
+void redOutCommand(int argc, char *argv[]) { //재지향 기호 >
 	int fd = open(argv[2], O_WRONLY | O_CREAT | O_APPEND, 0644);
 	int pid, status;
 
@@ -206,7 +218,7 @@ void redOutCommand(int argc, char *argv[]) {
 	close(fd);
 }
 
-void pipeCommand(int argc, char *argv[]) {
+void pipeCommand(int argc, char *argv[]) { //pipe명령어 구현
 	int pfd[2], pid, status;
 	
 	pipe(pfd);

@@ -12,6 +12,7 @@
 
 void myPwd();
 void myCd(char *path);
+void myEcho(int argc, char *argv[]);
 int splitToken(char *command, char *argv[], int cmdSize);
 char *getNextToken(char *command);
 void redirectionInput(int argc, char *argv[]);
